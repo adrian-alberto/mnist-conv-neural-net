@@ -256,6 +256,7 @@ int evaluate()
 void descend(float eta)
 {
     float G0 = 0;
+    float G_h[45] = {0};
     for (int j = 0; j < 10; j++)
     {
         float g0 = (z_o[j] - t[j]) * dActivate(z_o[j]);
@@ -264,8 +265,10 @@ void descend(float eta)
 
         for (int i = 0; i < 45; i++)
         {
+            G_h[i] += w_ho[i][j] * g0;
             w_ho[i][j] -= eta * g0 * y_h[i];
         }
+
     }
 
     for (int i = 0; i < 45; i++)
@@ -273,14 +276,55 @@ void descend(float eta)
         /*
         dE[j]   dz_o[j] ds_o[j] dy_h[i]
         dz_o[j] ds_o[j] dy_h[i] db_h[i]
-          '---------'     
+          '-------.-------'      1
+               G_h[i]  
         */
-        float w_ho_i = 0;
-        for (int j = 0; j < 10; j++)
-            w_ho_i += w_ho[i][j]
-        w_ho_i = G0 * g1;;
-        b_h[i] -= eta*g1;
+        b_h[i] -= eta*G_h[i];
     }
+
+    for (int frame = 0; frame < 8; frame++)
+    {
+        float G_c = 0; //total gradient at the conv layer
+
+        for (int mx = 0; mx < 12; mx++)
+        {
+            for (int my = 0; my < 12; my++)
+            {
+                float G_m = 0;
+                for (int i = 0; i < 45; i++)
+                {
+                    G_m += w_mh[frame][mx][my][i] * G_h[i];
+                    w_mh[frame][mx][my][i] -= eta*G_h[i]*y_m[frame][mx][my];
+                }
+
+                for (int cx = mx; cx < mx+2; cx++)
+                {
+                    for (int cy = my; cy < my+2; cy++)
+                    {
+                        if (y_c[frame][cx][cy] == y_m[frame][mx][my])
+                        {
+                            //g_c is the gradient at this convolutional layer at (cx,cy)
+                            //float g_c = G_m;
+                            //G_c += g_c;
+
+                            /*for (int ix = cx; ix < cx+5; ix++)
+                                for (int iy = cy; iy < cy+5; iy++)
+                                    w_ic[frame][ix-cx][iy-cy] -= eta*input[ix][iy]*g_c * dActivate(y_c[frame][cx][cy]);*/
+
+                        }
+                    }
+                }
+            }
+        }
+
+        b_c[frame] -= eta*G_c;
+
+
+
+    }
+
+
+
 
 
 }
