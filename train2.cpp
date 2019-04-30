@@ -22,10 +22,10 @@ float w_ic[8][5][5] = {0};
 float b_c[8] = {0};
 float y_c[8][24][24] = {0};
 float y_m[8][12][12] = {0};
-float w_ms[8][12][12][45] = {0};
-float b_s[45] = {0};
-float y_s[45] = {0};
-float w_so[45][10] = {0};
+float w_mh[8][12][12][45] = {0};
+float b_h[45] = {0};
+float y_h[45] = {0};
+float w_ho[45][10] = {0};
 float b_o[10] = {0};
 float z_o[10] = {0};
 float t[10] = {0};
@@ -42,6 +42,10 @@ int evaluate(); //returns 1 if correct, 0 if incorrect
 void descend(float);
 float max(float,float,float,float);
 void outputWeights(int,int);
+float activate(float);
+float dActivate(float);
+
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
 
 int main()
 {
@@ -61,7 +65,7 @@ int main()
             //Set inputs
             for (int x = 0; x < 28; x++)
                 for (int y = 0; y < 28; y++)
-                    input[x][y] = train[n][x][y];
+                    input[x][y] = train_input[n][x][y];
 
             //Set truth values
             for (int i = 0; i < 10; i++)
@@ -71,18 +75,26 @@ int main()
                     t[i] = 1;
             }
 
-			numCorrect += evaluate();
+            //Feed-forward and record result
+			if (train_label[n] == evaluate())
+                numCorrect++;
+
+            //Back-propagate
+            descend(learning_rate);
 		}
+        std::cout << "epoch " << epoch << ": " << ((float) numCorrect)/600.0f << "% training accuracy" << std::endl;
 	}
 
 
 	return 0;
 }
 
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
+
 void initRandom()
 {
     srand(time(0));
-    for (int i = 0; i<6; i++)
+    for (int i = 0; i<8; i++)
     {
         for (int j = 0; j<5; j++)
         {
@@ -92,49 +104,23 @@ void initRandom()
             }
         }
     }
-    for (int i = 0; i<6; i++)
+    for (int i = 0; i<8; i++)
     {
-        for (int j = 0; j<24; j++)
-        {
-            for (int k = 0; k<24; k++)
-            {
-                b_c[i][j][k] = (float) rand() / (float)(RAND_MAX) - 0.5;
-            }
-        }
+        b_c[i] = (float) rand() / (float)(RAND_MAX) - 0.5;
+        for (int j = 0; j < 12; j++)
+            for (int k = 0; k < 12; k++)
+                w_mh[i][j][k];
     }
-    for (int i = 0; i<6; i++)
-    {
-        for (int j = 0; j<12; j++)
-        {
-            for (int k = 0; k<12; k++)
-            {
-                w_cm[i][j][k] = (float) rand() / (float)(RAND_MAX) - 0.5;
-            }
-        }
-    }
-    for (int i = 0; i<6; i++)
-    {
-        for (int j = 0; j<12; j++)
-        {
-            for (int k = 0; k<12; k++)
-            {
-                for (int l = 0; l < 45; l++)
-                {
-                    u[i][j][k][l] = (float) rand() / (float)(RAND_MAX) - 0.5;
-                } 
-            }
-        }
-    }
+
     for (int i = 0; i < 45; i++)
     {
-        b_sig[i] = (float) rand() / (float)(RAND_MAX) - 0.5;
+        b_h[i] = (float) rand() / (float)(RAND_MAX) - 0.5;
         for (int j = 0; j < 10; j++)
-            v[i][j] = (float) rand() / (float)(RAND_MAX) - 0.5;
+            w_ho[i][j] = (float) rand() / (float)(RAND_MAX) - 0.5;
     }
     for (int i = 0; i < 10; i++)
-                b_out[i] = (float) rand() / (float)(RAND_MAX) - 0.5;
+        b_o[i] = (float) rand() / (float)(RAND_MAX) - 0.5;
 }
-
 
 int loadData()
 {
@@ -163,7 +149,7 @@ int loadData()
         {
             for (int j=0; j<28; j++){
                 trainingFile.read((char*)&byte, 1);
-                train[n][i][j] = (float)(int)byte/255.0f;
+                train_input[n][i][j] = (float)(int)byte/255.0f;
             }
         }
         labelFile.read((char*)&byte, 1);
@@ -191,7 +177,7 @@ int loadData()
         {
             for (int j=0; j<28; j++){
                 testingFile.read((char*)&byte, 1);
-                test[n][i][j] = (float)(int)byte/255.0f;
+                test_input[n][i][j] = (float)(int)byte/255.0f;
             }
         }
         testLabelFile.read((char*)&byte, 1);
@@ -202,10 +188,137 @@ int loadData()
     return 0;
 }
 
-
-
-
 int evaluate()
 {
-	
+    //convolution layer
+    for (int frame = 0; frame < 8; frame++)
+    {
+        for (int cx = 0; cx < 24; cx++)
+        {
+            for (int cy = 0; cy < 24; cy++)
+            {
+                float s = b_c[frame];
+                for (int ix = 0; ix < 5; ix++)
+                    for (int iy = 0; iy < 5; iy++)
+                        s += (input[cx+ix][cy+iy] * w_ic[frame][ix][iy]);
+                y_c[frame][cx][cy] = activate(s);
+            }
+        }
+    }
+
+    //max layer
+    for (int frame = 0; frame < 8; frame++)
+    {
+        for (int mx = 0; mx < 12; mx++)
+        {
+            for (int my = 0; my < 12; my++)
+            {
+                y_m[frame][mx][my] = max(
+                        y_c[frame][mx*2][my*2],
+                        y_c[frame][mx*2][my*2+1],
+                        y_c[frame][mx*2+1][my*2],
+                        y_c[frame][mx*2+1][my*2+1]
+                    );
+            }
+        }
+    }
+
+    //hidden layer
+    for (int i = 0; i < 45; i++)
+    {
+        float s = b_h[i];
+        for (int frame = 0; frame < 8; frame++)
+            for (int mx = 0; mx < 12; mx++)
+                for (int my = 0; my < 12; my++)
+                    s += y_m[frame][mx][my] * w_mh[frame][mx][my][i];
+        y_h[i] = activate(s);
+    }
+
+    //output layer
+    float max_output = -10.0f;
+    int max_index = -1;
+    for (int j = 0; j < 10; j++)
+    {
+        float s = b_o[j];
+        for (int i = 0; i < 45; i++)
+            s += y_h[i] * w_ho[i][j];
+        z_o[j] = activate(s);
+        if (z_o[j] > max_output)
+        {
+            max_output = z_o[j];
+            max_index = j;
+        }
+    }
+
+	return max_index;
+}
+
+void descend(float eta)
+{
+    float G0 = 0;
+    for (int j = 0; j < 10; j++)
+    {
+        float g0 = (z_o[j] - t[j]) * dActivate(z_o[j]);
+        b_o[j] -= eta*g0;
+        G0 += g0;
+
+        for (int i = 0; i < 45; i++)
+        {
+            w_ho[i][j] -= eta * g0 * y_h[i];
+        }
+    }
+
+    for (int i = 0; i < 45; i++)
+    {
+        /*
+        dE[j]   dz_o[j] ds_o[j] dy_h[i]
+        dz_o[j] ds_o[j] dy_h[i] db_h[i]
+          '---------'     
+        */
+        float w_ho_i = 0;
+        for (int j = 0; j < 10; j++)
+            w_ho_i += w_ho[i][j]
+        w_ho_i = G0 * g1;;
+        b_h[i] -= eta*g1;
+    }
+
+
+}
+
+
+
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
+
+float Relu(float s)
+{
+    if (s > 0)
+        return s;
+    else
+        return 0.01*s;
+}
+
+float deltaRelu(float z)
+{
+    if (z > 0)
+        return 1;
+    else
+        return 0.01;
+}
+
+//sigmoid
+float activate(float s)
+{
+    return 1.0f/(1.0f + exp(-s));
+}
+//delta sigmoid
+float dActivate(float z)
+{
+    return z*(1.0f-z);
+}
+
+float max(float a, float b, float c, float d)
+{
+    float left = fmax(a,b);
+    float right = fmax(c,d);
+    return fmax(left, right);
 }
