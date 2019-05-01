@@ -1,19 +1,24 @@
 A convolutional neural network for recognizing handwritten characters from the MNIST data set.
 
 Author: Adrian Alberto
+
 Architect: Dr. Evangelos Yfantis (UNLV)
 
-##Instructions:
+Instructions:
+-------------
 
 To compile on GNU/Linux:
+
 `g++ mnist_neural_net.cpp -o cnn.out`
 
 To train a new model:
+
 `./cnn.out`
 
 After each epoch, a model file called `epochN_correctNNNN.txt` will be created.
 
 You can test this model by running:
+
 `./cnn.out epochN_correctNNNN.txt`
 
 After testing, you will be prompted to either continue training or show an example test sample.
