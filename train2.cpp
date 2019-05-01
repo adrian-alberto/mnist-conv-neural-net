@@ -12,7 +12,8 @@
 
 
 int max_epoch = 16;
-float learning_rate = 0.2;
+float learning_rate = 0.3;
+int outputPeriod = 6000; //number of iterations before outputting a partial accuracy
 
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -53,14 +54,23 @@ int main()
 		return 0;
 
 	initRandom();
-
+    int startTime = (int) time(0);
 	for (int epoch = 0; epoch < max_epoch; epoch++)
 	{
 		int numCorrect = 0;
+        int numCorrectPeriod = 0;
 		for (int n = 0; n < 60000; n++)
 		{
-            if (n % 1000 == 0)
-                std::cout << "Progress: " << n << "/60000 ... " <<std::endl;
+            if (n % outputPeriod == outputPeriod-1)
+            {
+                int dt = (int)time(0) - startTime;
+                int min = dt / 60;
+                int sec = dt - min*60;
+                std::cout << "Progress: " << n+1 << "/60000 ... ";
+                std::cout << "partial accuracy: " << numCorrectPeriod*100.0f / outputPeriod;
+                std::cout << "% @ " << min << "m " << sec << "s" << std::endl;
+                numCorrectPeriod = 0;
+            }
 
             //Set inputs
             for (int x = 0; x < 28; x++)
@@ -77,7 +87,10 @@ int main()
 
             //Feed-forward and record result
 			if (train_label[n] == evaluate())
+            {
                 numCorrect++;
+                numCorrectPeriod++;
+            }
 
             //Back-propagate
             descend(learning_rate);
@@ -259,8 +272,8 @@ void descend(float eta)
     float G_h[45] = {0};
     for (int j = 0; j < 10; j++)
     {
-        float g0 = (z_o[j] - t[j]) * dActivate(z_o[j]);
-        b_o[j] -= eta*g0;
+        float g0 = eta * (z_o[j] - t[j]) * dActivate(z_o[j]);
+        b_o[j] -= g0;
         G0 += g0;
 
         for (int i = 0; i < 45; i++)
@@ -279,7 +292,7 @@ void descend(float eta)
           '-------.-------'      1
                G_h[i]  
         */
-        b_h[i] -= eta*G_h[i];
+        b_h[i] -= G_h[i];
     }
 
     for (int frame = 0; frame < 8; frame++)
@@ -290,34 +303,38 @@ void descend(float eta)
         {
             for (int my = 0; my < 12; my++)
             {
+                //Total gradient across the max layer
                 float G_m = 0;
                 for (int i = 0; i < 45; i++)
                 {
-                    G_m += w_mh[frame][mx][my][i] * G_h[i];
-                    w_mh[frame][mx][my][i] -= eta*G_h[i]*y_m[frame][mx][my];
+                    G_m += w_mh[frame][mx][my][i] * dActivate(y_h[i]) *G_h[i];
+                    w_mh[frame][mx][my][i] -= G_h[i]*y_m[frame][mx][my];
                 }
-
-                for (int cx = mx; cx < mx+2; cx++)
+                //G_m /= 144.0f;
+                
+                for (int cx = mx*2; cx < mx*2+2; cx++)
                 {
-                    for (int cy = my; cy < my+2; cy++)
+                    for (int cy = my*2; cy < my*2+2; cy++)
                     {
+                        //Backpropagate only through max value of conv layer
                         if (y_c[frame][cx][cy] == y_m[frame][mx][my])
                         {
                             //g_c is the gradient at this convolutional layer at (cx,cy)
-                            //float g_c = G_m;
-                            //G_c += g_c;
+                            float g_c = G_m * dActivate(y_c[frame][cx][cy]);
+                            G_c += g_c;
 
-                            /*for (int ix = cx; ix < cx+5; ix++)
+                            for (int ix = cx; ix < cx+5; ix++)
                                 for (int iy = cy; iy < cy+5; iy++)
-                                    w_ic[frame][ix-cx][iy-cy] -= eta*input[ix][iy]*g_c * dActivate(y_c[frame][cx][cy]);*/
+                                    w_ic[frame][ix-cx][iy-cy] -= input[ix][iy]*g_c;
 
                         }
                     }
                 }
+                
             }
         }
 
-        b_c[frame] -= eta*G_c;
+        b_c[frame] -= G_c;
 
 
 
