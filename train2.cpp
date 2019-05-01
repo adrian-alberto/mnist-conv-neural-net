@@ -39,16 +39,17 @@ float test_label[10000] = {0};
 void loadWeights();
 void initRandom();
 int loadData();
+
 int evaluate(); //returns 1 if correct, 0 if incorrect
 void descend(float);
+
 float max(float,float,float,float);
-void outputWeights(int,int);
 float activate(float);
 float dActivate(float);
 
 
-
 int checkTestAccuracy();
+void outputWeights(int, int);
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
 
@@ -61,6 +62,7 @@ int main()
     int startTime = (int) time(0);
 	for (int epoch = 0; epoch < max_epoch; epoch++)
 	{
+        std::cout << "-----------------------------\nBeginning epoch..." << std::endl;
 		int numCorrect = 0;
         int numCorrectPeriod = 0;
 		for (int n = 0; n < 60000; n++)
@@ -100,10 +102,13 @@ int main()
             descend(learning_rate);
 		}
 
+        std::cout << "Testing..." << std::endl;
         int testCorrect = checkTestAccuracy();
 
         std::cout << "epoch " << epoch << ": " << ((float) numCorrect)/600.0f << "% training accuracy; ";
         std::cout << ((float) testCorrect)/100.0f << "% test accuracy" << std::endl;
+
+        outputWeights(epoch, testCorrect);
 	}
 
 
@@ -116,15 +121,10 @@ void initRandom()
 {
     srand(time(0));
     for (int i = 0; i<8; i++)
-    {
         for (int j = 0; j<5; j++)
-        {
             for (int k = 0; k<5; k++)
-            {
                 w_ic[i][j][k] = (float) rand() / (float)(RAND_MAX) - 0.5;
-            }
-        }
-    }
+
     for (int i = 0; i<8; i++)
     {
         b_c[i] = (float) rand() / (float)(RAND_MAX) - 0.5;
@@ -366,43 +366,52 @@ int checkTestAccuracy()
         }
 
         //Feed-forward
-        evaluate();
-
+        int best_z = evaluate();
         //Check if correct
-        float max = 0;
-        int best_z = 0;
-        for (int i = 0; i < 10; i++)
-        {
-            if (z_o[i] > max)
-            {
-                max = z_o[i];
-                best_z = i;
-            }
-        }
-
         if (best_z == test_label[n])
             numCorrect++;
     }
     return numCorrect;
 }
 
+void outputWeights(int epoch, int testCorrect)
+{
+    std::ostringstream oss;
+    oss << "epoch" << epoch << "_correct" << testCorrect << ".txt";
+    std::cout << "Outputting weight file: " << oss.str() << std::endl;
+    
+    std::ofstream weightfile (oss.str().c_str());
+
+    if (weightfile.is_open())
+    {
+        for (int i = 0; i<8; i++)
+            for (int j = 0; j<5; j++)
+                for (int k = 0; k<5; k++)
+                    weightfile << w_ic[i][j][k] << std::endl;
+
+        for (int i = 0; i<8; i++)
+        {
+            weightfile << b_c[i] << std::endl;
+            for (int j = 0; j<12; j++)
+                for (int k = 0; k<12; k++)
+                    for (int l = 0; l < 45; l++)
+                        weightfile << w_mh[i][j][k][l] << std::endl;
+        }
+
+        for (int i = 0; i < 45; i++)
+        {
+            weightfile << b_h[i] << std::endl;
+            for (int j = 0; j < 10; j++)
+                weightfile << w_ho[i][j] << std::endl;
+        }
+        for (int i = 0; i < 10; i++)
+            weightfile << b_o[i] << std::endl;
+
+        weightfile.close();
+    }
+}
+
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
-
-float Relu(float s)
-{
-    if (s > 0)
-        return s;
-    else
-        return 0.01*s;
-}
-
-float deltaRelu(float z)
-{
-    if (z > 0)
-        return 1;
-    else
-        return 0.01;
-}
 
 //sigmoid
 float activate(float s)
