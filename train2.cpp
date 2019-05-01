@@ -46,6 +46,10 @@ void outputWeights(int,int);
 float activate(float);
 float dActivate(float);
 
+
+
+int checkTestAccuracy();
+
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
 
 int main()
@@ -95,7 +99,11 @@ int main()
             //Back-propagate
             descend(learning_rate);
 		}
-        std::cout << "epoch " << epoch << ": " << ((float) numCorrect)/600.0f << "% training accuracy" << std::endl;
+
+        int testCorrect = checkTestAccuracy();
+
+        std::cout << "epoch " << epoch << ": " << ((float) numCorrect)/600.0f << "% training accuracy; ";
+        std::cout << ((float) testCorrect)/100.0f << "% test accuracy" << std::endl;
 	}
 
 
@@ -335,18 +343,48 @@ void descend(float eta)
         }
 
         b_c[frame] -= G_c;
-
-
-
     }
-
-
-
-
-
 }
 
 
+int checkTestAccuracy()
+{
+    int numCorrect = 0;
+    for (int n = 0; n < 10000; n++)
+    {
+        //Set inputs
+        for (int x = 0; x < 28; x++)
+            for (int y = 0; y < 28; y++)
+                input[x][y] = test_input[n][x][y];
+
+        //Set truth values
+        for (int i = 0; i < 10; i++)
+        {
+            t[i] = 0;
+            if (i == test_label[n])
+                t[i] = 1;
+        }
+
+        //Feed-forward
+        evaluate();
+
+        //Check if correct
+        float max = 0;
+        int best_z = 0;
+        for (int i = 0; i < 10; i++)
+        {
+            if (z_o[i] > max)
+            {
+                max = z_o[i];
+                best_z = i;
+            }
+        }
+
+        if (best_z == test_label[n])
+            numCorrect++;
+    }
+    return numCorrect;
+}
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
 
