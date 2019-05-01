@@ -1,6 +1,6 @@
 /*
- * Adrian Alberto
- * 5002933684
+ * Author: Adrian Alberto
+ * Architect: Dr. Evangelos Yfantis
  */
 
 #include <iostream>
